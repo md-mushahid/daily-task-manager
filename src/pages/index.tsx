@@ -1,11 +1,30 @@
 "use client";
 
-import { Card, Typography, Button, Divider } from "antd";
+import { useState, useEffect } from "react";
+import { Card, Typography, Button, Divider, Modal, List, Empty } from "antd";
 import Link from "next/link";
 
 const { Title, Paragraph, Text } = Typography;
 
+type DailyProgress = {
+  date: string;
+  completed: number;
+  total: number;
+  percent: number;
+};
+
 export default function HomePage() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [progressHistory, setProgressHistory] = useState<DailyProgress[]>([]);
+
+  // Load history from localStorage
+  useEffect(() => {
+    const savedHistory = localStorage.getItem("progressHistory");
+    if (savedHistory) {
+      setProgressHistory(JSON.parse(savedHistory));
+    }
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-green-100 via-white to-green-50 p-6">
       {/* শিরোনাম */}
@@ -32,12 +51,53 @@ export default function HomePage() {
       </Card>
 
       {/* দৈনিক কাজের বাটন */}
-      <Divider className="w-full max-w-xl border-green-300" />ß
-      <Link href="/tasks">
-        <Button type="primary" size="large" className="bg-green-600 hover:bg-green-700 text-white px-8 rounded-xl shadow-lg">
-          📖 দৈনিক কাজ আপডেট করুন
+      <Divider className="w-full max-w-xl border-green-300" />
+      <div className="flex gap-4">
+        <Link href="/tasks">
+          <Button
+            type="primary"
+            size="large"
+            className="bg-green-600 hover:bg-green-700 text-white px-8 rounded-xl shadow-lg"
+          >
+            📖 দৈনিক কাজ আপডেট করুন
+          </Button>
+        </Link>
+
+        <Button
+          type="default"
+          size="large"
+          className="px-8 rounded-xl shadow"
+          onClick={() => setIsModalOpen(true)}
+        >
+          📊 ইতিহাস
         </Button>
-      </Link>
+      </div>
+
+      {/* ইতিহাস Modal */}
+      <Modal
+        title="📊 গত ৭ দিনের ইতিহাস"
+        open={isModalOpen}
+        onCancel={() => setIsModalOpen(false)}
+        footer={[
+          <Button key="close" onClick={() => setIsModalOpen(false)}>
+            বন্ধ করুন
+          </Button>,
+        ]}
+      >
+        {progressHistory.length > 0 ? (
+          <List
+            dataSource={progressHistory}
+            renderItem={(p) => (
+              <List.Item>
+                <Text strong>{p.date}</Text> — {p.percent}% ({p.completed}/
+                {p.total})
+              </List.Item>
+            )}
+          />
+        ) : (
+          <Empty description="কোনো ইতিহাস পাওয়া যায়নি" />
+        )}
+      </Modal>
     </div>
   );
 }

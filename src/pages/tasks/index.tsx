@@ -1,33 +1,87 @@
 "use client";
-import { useState } from "react";
-import { Card, Typography, List, Checkbox, Button, message } from "antd";
+import { useEffect, useState } from "react";
+import { Card, Typography, List, Checkbox, Button, message, Modal } from "antd";
+import dailyTasks from "@/utils/dailyTasks";
+import Link from "next/link";
 
 const { Title } = Typography;
 
-export default function UserTaskPage() {
-  // Static tasks
-  const [tasks, setTasks] = useState<{ id: number; name: string; done: boolean }[]>([
-    { id: 1, name: "ফজর নামাজ পড়া", done: false },
-    { id: 2, name: "কোরআন তিলাওয়াত", done: false },
-    { id: 3, name: "আসর নামাজ পড়া", done: false },
-    { id: 4, name: "মাগরিব নামাজ পড়া", done: false },
-    { id: 5, name: "ইশা নামাজ পড়া", done: false },
-    { id: 6, name: "তাহাজ্জুদ নামাজ", done: false },
-  ]);
+type DailyProgress = {
+  date: string;
+  completed: number;
+  total: number;
+  percent: number;
+  tasks: { id: number; name: string; done: boolean }[];
+};
 
-  // Toggle task done/undone
-  const toggleTask = (taskId: number) => {
-    const updatedTasks = tasks.map((task) =>
-      task.id === taskId ? { ...task, done: !task.done } : task
-    );
-    setTasks(updatedTasks);
+export default function UserTaskPage() {
+  const [tasks, setTasks] = useState<{ id: number; name: string; done: boolean }[]>([]);
+  const [progressHistory, setProgressHistory] = useState<DailyProgress[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+
+  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+  const fetchTasks = async () => {
+    const response = await dailyTasks();
+    const todayHistory = progressHistory.find((p) => p.date === today);
+    if (todayHistory) {
+      setTasks(todayHistory.tasks);
+    } else {
+      setTasks(response);
+    }
   };
 
-  // Update button action
+  useEffect(() => {
+    const savedHistory = localStorage.getItem("progressHistory");
+    if (savedHistory) {
+      setProgressHistory(JSON.parse(savedHistory));
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [progressHistory]);
+
+  useEffect(() => {
+    localStorage.setItem("progressHistory", JSON.stringify(progressHistory));
+  }, [progressHistory]);
+
+  const toggleTask = (taskId: number) => {
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === taskId ? { ...task, done: !task.done } : task
+      )
+    );
+  };
+
   const updateTasks = () => {
-    // For now, just show a message
-    message.success("আপনার দৈনিক কাজ আপডেট হয়েছে ✅");
-    console.log("Updated tasks:", tasks); // Later send to DB/API
+    const completed = tasks.filter((t) => t.done).length;
+    const total = tasks.length;
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    const todayHistory = progressHistory.find((p) => p.date === today);
+
+    if (todayHistory) {
+      message.warning("⚠️ আপনি আজকের কাজ ইতিমধ্যে আপডেট করেছেন!");
+      return;
+    }
+
+    setLoading(true);
+
+    setTimeout(() => {
+      setProgressHistory((prev) => {
+        const filtered = prev.filter((p) => p.date !== today);
+        const updated = [
+          ...filtered,
+          { date: today, completed, total, percent, tasks },
+        ];
+        return updated.slice(-7);
+      });
+
+      setLoading(false);
+      setSuccessModalVisible(true);
+    }, 1000); // simulate async delay
   };
 
   return (
@@ -49,10 +103,37 @@ export default function UserTaskPage() {
           )}
         />
       </Card>
-    <br/>
-      <Button className="px-8" type="primary" size="large" onClick={updateTasks}>
-        ⬆️ দৈনিক কাজ আপডেট করুন
-      </Button>
+
+      <div className="flex gap-4 mt-4">
+        <Button
+          className="px-8"
+          type="primary"
+          size="large"
+          loading={loading}
+          onClick={updateTasks}
+        >
+          ⬆️ আজকের কাজ আপডেট করুন
+        </Button>
+
+        <Link href="/" passHref>
+          <Button className="px-8" type="default" size="large">
+            🏠 হোমে ফিরে যান
+          </Button>
+        </Link>
+      </div>
+
+      {/* Success Popup */}
+      <Modal
+        open={successModalVisible}
+        footer={null}
+        onCancel={() => setSuccessModalVisible(false)}
+        centered
+      >
+        <div className="text-center p-4">
+          <h2 className="text-green-600 text-lg font-semibold mb-2">✅ সফল!</h2>
+          <p>আজকের কাজ সফলভাবে আপডেট হয়েছে!</p>
+        </div>
+      </Modal>
     </div>
   );
 }
